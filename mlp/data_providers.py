@@ -135,8 +135,8 @@ class MNISTDataProvider(DataProvider):
 
     # def next(self):
     #    """Returns next data batch or raises `StopIteration` if at end."""
-    #    inputs_batch, targets_batch = super(MNISTDataProvider, self).next()
-    #    return inputs_batch, self.to_one_of_k(targets_batch)
+         inputs_batch, targets_batch = super(MNISTDataProvider, self).next()
+         return inputs_batch, self.to_one_of_k(targets_batch)
     #
     def __next__(self):
         return self.next()
@@ -156,8 +156,9 @@ class MNISTDataProvider(DataProvider):
             to zero except for the column corresponding to the correct class
             which is equal to one.
         """
-        raise NotImplementedError()
-
+        one_of_k_targets = np.zeros((int_targets.shape[0], self.num_classes))
+        one_of_k_targets[range(int_targets.shape[0]), int_targets] = 1
+        return one_of_k_targets
 
 class MetOfficeDataProvider(DataProvider):
     """South Scotland Met Office weather data provider."""
