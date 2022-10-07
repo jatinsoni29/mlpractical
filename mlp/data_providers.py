@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 """Data providers.
-
 This module provides classes for loading datasets and iterating over batches of
 data points.
 """
@@ -18,7 +17,6 @@ class DataProvider(object):
     def __init__(self, inputs, targets, batch_size, max_num_batches=-1,
                  shuffle_order=True, rng=None):
         """Create a new data provider object.
-
         Args:
             inputs (ndarray): Array of data input features of shape
                 (num_data, input_dim).
@@ -55,7 +53,6 @@ class DataProvider(object):
 
     def __iter__(self):
         """Implements Python iterator interface.
-
         This should return an object implementing a `next` method which steps
         through a sequence returning one element at a time and raising
         `StopIteration` when at the end of the sequence. Here the object
@@ -75,6 +72,9 @@ class DataProvider(object):
         self.inputs = self.inputs[new_order]
         self.targets = self.targets[new_order]
 
+    def __next__(self):
+        return self.next()
+    
     def next(self):
         """Returns next data batch or raises `StopIteration` if at end."""
         if self._curr_batch + 1 > self.num_batches:
@@ -97,7 +97,6 @@ class MNISTDataProvider(DataProvider):
     def __init__(self, which_set='train', batch_size=100, max_num_batches=-1,
                  shuffle_order=True, rng=None):
         """Create a new MNIST data provider object.
-
         Args:
             which_set: One of 'train', 'valid' or 'eval'. Determines which
                 portion of the MNIST data this object should provide.
@@ -133,23 +132,21 @@ class MNISTDataProvider(DataProvider):
         super(MNISTDataProvider, self).__init__(
             inputs, targets, batch_size, max_num_batches, shuffle_order, rng)
 
-    # def next(self):
-    #    """Returns next data batch or raises `StopIteration` if at end."""
-         inputs_batch, targets_batch = super(MNISTDataProvider, self).next()
-         return inputs_batch, self.to_one_of_k(targets_batch)
-    #
+    def next(self):
+        """Returns next data batch or raises `StopIteration` if at end."""
+        inputs_batch, targets_batch = super(MNISTDataProvider, self).next()
+        return inputs_batch, self.to_one_of_k(targets_batch)
+    
     def __next__(self):
         return self.next()
 
     def to_one_of_k(self, int_targets):
         """Converts integer coded class target to 1 of K coded targets.
-
         Args:
             int_targets (ndarray): Array of integer coded class targets (i.e.
                 where an integer from 0 to `num_classes` - 1 is used to
                 indicate which is the correct class). This should be of shape
                 (num_data,).
-
         Returns:
             Array of 1 of K coded targets i.e. an array of shape
             (num_data, num_classes) where for each row all elements are equal
@@ -160,13 +157,13 @@ class MNISTDataProvider(DataProvider):
         one_of_k_targets[range(int_targets.shape[0]), int_targets] = 1
         return one_of_k_targets
 
+
 class MetOfficeDataProvider(DataProvider):
     """South Scotland Met Office weather data provider."""
 
     def __init__(self, window_size, batch_size=10, max_num_batches=-1,
                  shuffle_order=True, rng=None):
         """Create a new Met Offfice data provider object.
-
         Args:
             window_size (int): Size of windows to split weather time series
                data into. The constructed input features will be the first
@@ -181,8 +178,6 @@ class MetOfficeDataProvider(DataProvider):
                 the data before each epoch.
             rng (RandomState): A seeded random number generator.
         """
-        self.window_size = window_size
-        assert window_size > 1, 'window_size must be at least 2.'
         data_path = os.path.join(
             os.environ['MLP_DATA_DIR'], 'HadSSP_daily_qc.txt')
         assert os.path.isfile(data_path), (
@@ -190,18 +185,30 @@ class MetOfficeDataProvider(DataProvider):
         )
         # load raw data from text file
         # ...
+        raw = np.loadtxt(data_path, skiprows=3, usecols=range(2, 32))
+        assert window_size > 1, 'window_size must be at least 2.'
+        self.window_size = window_size
+        
         # filter out all missing datapoints and flatten to a vector
         # ...
+        filtered = raw[raw >= 0].flatten()
         # normalise data to zero mean, unit standard deviation
         # ...
+        mean = np.mean(filtered)
+        std = np.std(filtered)
+        normalised = (filtered - mean) / std
         # convert from flat sequence to windowed data
         # ...
+        shape = (normalised.shape[-1] - self.window_size + 1, self.window_size)
+        strides = normalised.strides + (normalised.strides[-1],)
+        windowed = np.lib.stride_tricks.as_strided(normalised, shape=shape, strides=strides)
         # inputs are first (window_size - 1) entries in windows
-        # inputs = ...
+        inputs = windowed[:, :-1]
         # targets are last entry in windows
-        # targets = ...
+        targets = windowed[:, -1]
         # initialise base class with inputs and targets arrays
-        # super(MetOfficeDataProvider, self).__init__(
-        #     inputs, targets, batch_size, max_num_batches, shuffle_order, rng)
+        super(MetOfficeDataProvider, self).__init__(inputs, targets, batch_size, max_num_batches, shuffle_order, rng)
+    
+    
     def __next__(self):
             return self.next()
